@@ -42,7 +42,6 @@
                     <div class="card">
                         <div class="card-header p-3">
                             <h4 class="text-center mb-4">Laravel Implement Cropper JS</h4>
-                            <input type="file" id="image" name="image" class="form-control" accept="image/*" />
                         </div>
                         <div class="card-body d-flex gap-3">
                             <div class="g-buttons d-flex flex-column gap-2 bg-dark p-2 rounded-2">
@@ -54,52 +53,23 @@
                                 <button onClick="zoomOut()" class="btn btn-danger">-</button>
                                 <button onClick="centerImage()" class="btn btn-light">Center</button>
                                 <button onClick="resetAll()" class="btn btn-info">Reset</button>
+                                <button onClick="resetToOriginal()" class="btn btn-warning">Original</button>
                             </div>
                             <div class="image">
-                                <img id="previewImage" />
+                                <img id="previewImage" src="{{ asset($image->crop_image) }}"
+                                    data-original="{{ asset($image->image) }}" />
                             </div>
                         </div>
                         <div class="card-footer">
-                            <form id="uploadForm" method="POST" action="{{ route('upload') }}"
+                            <form id="updateForm" method="POST" action="{{ route('update') }}"
                                 enctype="multipart/form-data">
                                 @csrf
-                                <button type="submit" class="btn btn-primary w-100">Save Cropped Image</button>
+                                <input type="hidden" name="image_id" value="{{ $image->id }}">
+                                <button type="submit" class="btn btn-primary w-100">Update Cropped Image</button>
                             </form>
                         </div>
                     </div>
                 </div>
-                <hr>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>s.n</th>
-                            <th>Original Image</th>
-                            <th>Crop Image</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($images as $key => $image)
-                            <tr>
-                                <td>{{ ++$key }}</td>
-                                <td>
-                                    <img src="{{ asset($image->image) }}" alt="" width="200">
-                                </td>
-                                <td>
-                                    <img src="{{ asset($image->crop_image) }}" alt="" width="200">
-                                </td>
-                                <td>
-                                    <a href="{{ route('edit', $image->id) }}" class="btn btn-primary">Edit</a>
-                                    <form action="{{ route('delete', $image->id) }}" method="POST">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-danger">Delete</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
             </div>
         </section>
 
@@ -114,8 +84,58 @@
         {{-- cdn cropjs --}}
         <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
+
+        <script>
+            // Initialize cropper on page load
+            window.addEventListener("load", function() {
+                const img = document.getElementById("previewImage");
+                originalImageURL = img.src;
+                cropper = new Cropper(img, {
+                    aspectRatio: NaN,
+                    viewMode: 1,
+                });
+            });
+
+            document.getElementById("updateForm").addEventListener("submit", function(e) {
+                e.preventDefault();
+
+                if (!cropper) {
+                    alert("Update and crop an image first.");
+                    return;
+                }
+
+                // Get base64 data URL from cropper
+                const croppedBase64 = cropper.getCroppedCanvas().toDataURL('image/jpeg');
+
+                // Create FormData object and append necessary data
+                const formData = new FormData();
+                formData.append("cropped_image", croppedBase64);
+                formData.append("image_id", this.querySelector("input[name='image_id']").value);
+                formData.append("_token", this.querySelector("input[name='_token']").value);
+
+                fetch(this.action, {
+                        method: "POST",
+                        body: formData,
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            // Optionally update the preview image src with new cropped image URL
+                            document.getElementById("previewImage").src = data.cropped;
+                        } else {
+                            alert("Update failed: " + (data.message || "Unknown error"));
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Update failed:", error);
+                        alert("Image update failed.");
+                    });
+            });
+        </script>
         {{-- main script --}}
         <script src="/js/main.js"></script>
+
     </body>
 
 </html>

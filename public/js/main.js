@@ -89,6 +89,31 @@ function resetToOriginal(originalUrl) {
     });
 }
 
+// ✅ Reset back to original uploaded image (not just crop reset)
+function resetToOriginal() {
+    const img = document.getElementById("previewImage");
+    const originalSrc = img.getAttribute("data-original");
+
+    if (originalSrc) {
+        const newSrc = originalSrc + "?t=" + new Date().getTime();
+
+        if (cropper) cropper.destroy();
+
+        img.onload = () => {
+            cropper = new Cropper(img, {
+                aspectRatio: NaN,
+                viewMode: 1,
+            });
+            scaleX = 1;
+            scaleY = 1;
+        };
+
+        img.src = newSrc;
+    } else {
+        alert("No original image found.");
+    }
+}
+
 // upload image
 document.getElementById("uploadForm").addEventListener("submit", function (e) {
     e.preventDefault();
@@ -100,13 +125,7 @@ document.getElementById("uploadForm").addEventListener("submit", function (e) {
 
     cropper.getCroppedCanvas().toBlob(function (blob) {
         const formData = new FormData();
-        const fileInput = document.getElementById("image");
-        const originalFile = fileInput.files[0];
-
-        if (!originalFile) {
-            alert("No original image selected.");
-            return;
-        }
+        const originalFile = document.getElementById("image").files[0];
 
         formData.append("image", originalFile);
         formData.append("cropped_image", blob, "cropped_" + originalFile.name);
