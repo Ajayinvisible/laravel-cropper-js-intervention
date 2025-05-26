@@ -9,5 +9,6 @@ class Image extends Model
     protected $fillable = [
         'image',
         'crop_image',
+        'passport_image',
     ];
 }

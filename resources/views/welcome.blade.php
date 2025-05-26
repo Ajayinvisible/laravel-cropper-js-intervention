@@ -75,6 +75,7 @@
                             <th>s.n</th>
                             <th>Original Image</th>
                             <th>Crop Image</th>
+                            <th>Passport Size Image</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -87,6 +88,9 @@
                                 </td>
                                 <td>
                                     <img src="{{ asset($image->crop_image) }}" alt="" width="200">
+                                </td>
+                                <td>
+                                    <img src="{{ asset($image->passport_image) }}" alt="" width="200">
                                 </td>
                                 <td>
                                     <a href="{{ route('edit', $image->id) }}" class="btn btn-primary">Edit</a>

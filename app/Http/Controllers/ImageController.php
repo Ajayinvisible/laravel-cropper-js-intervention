@@ -7,7 +7,8 @@ use App\Models\Image;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
-
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
 
 class ImageController extends Controller
 {
@@ -21,12 +22,13 @@ class ImageController extends Controller
 
     public function upload(Request $request)
     {
+        // Validate input
         $request->validate([
             'image' => 'required|image|mimes:png,jpg,jpeg,gif|max:2048',
             'cropped_image' => 'required|file|mimes:jpeg,png,jpg',
         ]);
 
-        // Original image
+        // Handle original image
         $original = $request->file('image');
         $originalName = time() . '_' . Str::random(10) . '.' . $original->getClientOriginalExtension();
 
@@ -36,7 +38,7 @@ class ImageController extends Controller
         }
         $original->move($originalPath, $originalName);
 
-        // Cropped image
+        // Handle cropped image
         $cropped = $request->file('cropped_image');
         $croppedName = 'cropped_' . $originalName;
 
@@ -46,17 +48,28 @@ class ImageController extends Controller
         }
         $cropped->move($croppedPath, $croppedName);
 
-        // Save in DB
+        // Generate passport-sized image (600x600)
+        $passportName = 'passport_' . $originalName;
+
+        $imageManager = new ImageManager(new Driver());
+        $ppCroppedImage = $imageManager->read($croppedPath . '/' . $croppedName);
+        $ppCroppedImage->resize(600, 600);
+        $ppCroppedImage->save($croppedPath . '/' . $passportName);
+
+        // Save file paths in the database
         $image = Image::create([
             'image' => 'images/original/' . $originalName,
             'crop_image' => 'images/crop-image/' . $croppedName,
+            'passport_image' => 'images/crop-image/' . $passportName,
         ]);
 
+        // Return JSON response
         return response()->json([
             'success' => true,
             'message' => 'Image uploaded successfully!',
             'original' => asset('images/original/' . $originalName),
             'cropped' => asset('images/crop-image/' . $croppedName),
+            'passport' => asset('images/crop-image/' . $passportName),
             'image_id' => $image->id,
         ]);
     }
@@ -92,32 +105,45 @@ class ImageController extends Controller
             return response()->json(['success' => false, 'message' => 'Base64 decoding failed.'], 422);
         }
 
-        // Save cropped image
-        $croppedName = 'cropped_' . time() . '_' . Str::random(10) . '.' . $ext;
+        // Define paths and names
+        $timestamp = time();
+        $unique = Str::random(10);
+        $croppedName = 'cropped_' . $timestamp . '_' . $unique . '.' . $ext;
+        $passportName = 'passport_' . $timestamp . '_' . $unique . '.' . $ext;
         $croppedPath = public_path('images/crop-image');
 
         if (!File::exists($croppedPath)) {
             File::makeDirectory($croppedPath, 0755, true);
         }
 
-        // Delete old cropped image if exists
-        $oldCropImagePath = public_path($image->crop_image);
-        if ($image->crop_image && File::exists($oldCropImagePath)) {
-            File::delete($oldCropImagePath);
+        // Delete old images if they exist
+        if ($image->crop_image && File::exists(public_path($image->crop_image))) {
+            File::delete(public_path($image->crop_image));
+        }
+        if ($image->passport_image && File::exists(public_path($image->passport_image))) {
+            File::delete(public_path($image->passport_image));
         }
 
-        // Save new cropped image file
+        // Save new cropped image
         file_put_contents($croppedPath . '/' . $croppedName, $croppedBase64);
+
+        // Generate passport image (600x600)
+        $imageManager = new ImageManager(new Driver());
+        $passportImage = $imageManager->read($croppedPath . '/' . $croppedName);
+        $passportImage->resize(600, 600);
+        $passportImage->save($croppedPath . '/' . $passportName);
 
         // Update DB
         $image->update([
             'crop_image' => 'images/crop-image/' . $croppedName,
+            'passport_image' => 'images/crop-image/' . $passportName,
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Cropped image updated successfully!',
+            'message' => 'Cropped and passport images updated successfully!',
             'cropped' => asset('images/crop-image/' . $croppedName),
+            'passport' => asset('images/crop-image/' . $passportName),
         ]);
     }
 
